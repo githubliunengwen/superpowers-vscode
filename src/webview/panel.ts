@@ -55,6 +55,9 @@ export class SuperpowersPanel {
       case 'openFile':
         vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path))
         break
+      case 'completePlan':
+        vscode.commands.executeCommand('superpowers.completePlan', message.path)
+        break
       case 'refresh':
         vscode.commands.executeCommand('superpowers.refresh')
         break
@@ -121,6 +124,9 @@ export class SuperpowersPanel {
     .file-item:hover {
       background: var(--vscode-list-hoverBackground);
     }
+    .file-item.completed .file-title {
+      color: var(--vscode-testing-iconPassed);
+    }
     .file-title {
       font-size: 13px;
     }
@@ -153,39 +159,98 @@ export class SuperpowersPanel {
     .refresh-btn:hover {
       background: var(--vscode-button-secondaryHoverBackground);
     }
+    .context-menu {
+      position: fixed;
+      z-index: 1000;
+      min-width: 160px;
+      background: var(--vscode-menu-background);
+      border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      padding: 4px 0;
+    }
+    .context-menu.hidden {
+      display: none;
+    }
+    .context-menu-item {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--vscode-menu-foreground);
+      text-align: left;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .context-menu-item:hover {
+      background: var(--vscode-menu-selectionBackground);
+      color: var(--vscode-menu-selectionForeground);
+    }
   </style>
 </head>
 <body>
   <div class="toolbar">
     <button class="refresh-btn" onclick="refresh()">刷新</button>
   </div>
-  
+
   <div class="section">
     <h2>📋 Specs <span class="count" id="specs-count">(0)</span></h2>
     <div id="specs-content"></div>
   </div>
-  
+
   <div class="section">
     <h2>📋 Plans <span class="count" id="plans-count">(0)</span></h2>
     <div id="plans-content"></div>
   </div>
 
+  <div id="context-menu" class="context-menu hidden">
+    <button id="complete-plan-action" class="context-menu-item" type="button">标记为已完成</button>
+  </div>
+
   <script>
     const vscode = acquireVsCodeApi();
-    
+    const contextMenu = document.getElementById('context-menu');
+    const completePlanAction = document.getElementById('complete-plan-action');
+    let contextMenuPlanPath = null;
+
+    function hideContextMenu() {
+      contextMenu.classList.add('hidden');
+      contextMenuPlanPath = null;
+    }
+
+    function showContextMenu(event, path) {
+      event.preventDefault();
+      event.stopPropagation();
+      contextMenuPlanPath = path;
+      contextMenu.style.left = event.clientX + 'px';
+      contextMenu.style.top = event.clientY + 'px';
+      contextMenu.classList.remove('hidden');
+    }
+
+    completePlanAction.addEventListener('click', () => {
+      if (!contextMenuPlanPath)
+        return;
+
+      vscode.postMessage({ command: 'completePlan', path: contextMenuPlanPath });
+      hideContextMenu();
+    });
+
+    document.addEventListener('click', hideContextMenu);
+    window.addEventListener('blur', hideContextMenu);
+    window.addEventListener('resize', hideContextMenu);
+
     function renderFiles(files, containerId, type) {
       const container = document.getElementById(containerId);
       const countEl = document.getElementById(containerId.replace('-content', '-count'));
-      
+
       if (!files || files.length === 0) {
         container.innerHTML = '<div class="empty">暂无文件</div>';
         countEl.textContent = '(0)';
         return;
       }
-      
+
       countEl.textContent = '(' + files.length + ')';
-      
-      // 按日期分组
+
       const groups = {};
       files.forEach(file => {
         const date = file.date || '未知日期';
@@ -194,14 +259,27 @@ export class SuperpowersPanel {
         }
         groups[date].push(file);
       });
-      
+
       let html = '';
       Object.keys(groups).sort().reverse().forEach(date => {
         html += '<div class="date-group">';
         html += '<div class="date-header">' + date + '</div>';
         html += '<ul class="file-list">';
         groups[date].forEach(file => {
-          html += '<li class="file-item" onclick="openFile(\\'' + file.path + '\\')">';
+          const isCompleted = type === 'plan' && file.progress && file.progress.total > 0 && file.progress.completed === file.progress.total;
+          const classes = ['file-item'];
+          if (type === 'plan') {
+            classes.push('plan-item');
+          }
+          if (isCompleted) {
+            classes.push('completed');
+          }
+          const encodedPath = encodeURIComponent(file.path);
+          html += '<li class="' + classes.join(' ') + '" onclick="openFile(\\'' + file.path + '\\')"';
+          if (type === 'plan') {
+            html += ' data-plan-path="' + encodedPath + '"';
+          }
+          html += '>';
           html += '<span class="file-title">' + file.title + '</span>';
           if (type === 'plan' && file.progress) {
             const cls = file.progress.completed === file.progress.total ? 'progress complete' : 'progress';
@@ -211,21 +289,34 @@ export class SuperpowersPanel {
         });
         html += '</ul></div>';
       });
-      
+
       container.innerHTML = html;
+
+      if (type === 'plan') {
+        container.querySelectorAll('.plan-item').forEach(item => {
+          item.addEventListener('contextmenu', event => {
+            const encodedPath = item.getAttribute('data-plan-path');
+            if (!encodedPath)
+              return;
+
+            showContextMenu(event, decodeURIComponent(encodedPath));
+          });
+        });
+      }
     }
-    
+
     function openFile(path) {
       vscode.postMessage({ command: 'openFile', path });
     }
-    
+
     function refresh() {
       vscode.postMessage({ command: 'refresh' });
     }
-    
+
     window.addEventListener('message', event => {
       const message = event.data;
       if (message.type === 'updateData') {
+        hideContextMenu();
         renderFiles(message.data.specs, 'specs-content', 'spec');
         renderFiles(message.data.plans, 'plans-content', 'plan');
       }

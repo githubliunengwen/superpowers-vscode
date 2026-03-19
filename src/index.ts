@@ -1,5 +1,8 @@
 import { defineExtension } from 'reactive-vscode'
+import * as fs from 'fs'
 import * as vscode from 'vscode'
+import { markPlanContentAsCompleted } from './planCompletion'
+import { shouldAutoOpenPanel } from './panelOpenInteraction'
 import { SuperpowersScanner } from './scanner'
 import { SuperpowersTreeDataProvider } from './treeView'
 import { SuperpowersPanel } from './webview/panel'
@@ -7,16 +10,18 @@ import { SuperpowersPanel } from './webview/panel'
 export const { activate, deactivate } = defineExtension(() => {
   const scanner = new SuperpowersScanner()
   const treeDataProvider = new SuperpowersTreeDataProvider()
+  const extensionUri = vscode.extensions.getExtension('superpowers.superpowers-vscode')!.extensionUri
+  let isAutoOpeningPanel = false
 
   // 注册 TreeView
-  vscode.window.createTreeView('superpowers-explorer', {
+  const treeView = vscode.window.createTreeView('superpowers-explorer', {
     treeDataProvider,
     showCollapseAll: false,
   })
+  let wasTreeViewVisible = treeView.visible
 
-  // 注册命令
-  vscode.commands.registerCommand('superpowers.openPanel', async () => {
-    const panel = SuperpowersPanel.createOrShow(vscode.extensions.getExtension('superpowers.superpowers-vscode')!.extensionUri)
+  const openPanel = async (): Promise<void> => {
+    const panel = SuperpowersPanel.createOrShow(extensionUri)
 
     // 扫描并更新数据
     const workspaceFolders = vscode.workspace.workspaceFolders
@@ -24,6 +29,45 @@ export const { activate, deactivate } = defineExtension(() => {
       const data = await scanner.scan(workspaceFolders[0].uri.fsPath)
       panel.updateData(data)
     }
+  }
+
+  const openPanelFromActivityBar = async (): Promise<void> => {
+    if (isAutoOpeningPanel)
+      return
+
+    isAutoOpeningPanel = true
+    try {
+      await openPanel()
+      try {
+        await vscode.commands.executeCommand('workbench.view.explorer')
+      }
+      catch (error) {
+        console.debug('切回 File Explorer 失败', error)
+      }
+    }
+    finally {
+      isAutoOpeningPanel = false
+    }
+  }
+
+  treeView.onDidChangeVisibility(async () => {
+    const isVisible = treeView.visible
+    const shouldAutoOpen = shouldAutoOpenPanel({
+      isVisible,
+      wasVisible: wasTreeViewVisible,
+      isAutoOpeningPanel,
+    })
+    wasTreeViewVisible = isVisible
+
+    if (!shouldAutoOpen)
+      return
+
+    await openPanelFromActivityBar()
+  })
+
+  // 注册命令
+  vscode.commands.registerCommand('superpowers.openPanel', async () => {
+    await openPanel()
   })
 
   vscode.commands.registerCommand('superpowers.refresh', async () => {
@@ -35,6 +79,20 @@ export const { activate, deactivate } = defineExtension(() => {
       }
     }
     treeDataProvider.refresh()
+  })
+
+  vscode.commands.registerCommand('superpowers.completePlan', async (planPath?: string) => {
+    if (!planPath)
+      return
+
+    const content = fs.readFileSync(planPath, 'utf-8')
+    const updatedContent = markPlanContentAsCompleted(content)
+
+    if (updatedContent === content)
+      return
+
+    fs.writeFileSync(planPath, updatedContent, 'utf-8')
+    await vscode.commands.executeCommand('superpowers.refresh')
   })
 
   // TreeView 点击事件
