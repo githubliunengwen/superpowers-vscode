@@ -31,19 +31,20 @@ src/
 
 #### 1. TreeView (treeView.ts)
 
-在 VS Code 活动栏注册一个自定义视图容器和树视图。
+在 VS Code 活动栏注册一个自定义视图容器。TreeView 仅作为入口点，点击后打开 Webview 面板。
 
 ```typescript
 // 视图容器 ID
 const VIEW_CONTAINER_ID = 'superpowers-explorer';
 
-// 树视图 ID
-const TREE_VIEW_ID = 'superpowers-projects';
+// 树视图 ID（用于激活 Webview）
+const TREE_VIEW_ID = 'superpowers-explorer';
 ```
 
 **功能**:
-- 显示当前工作区中的项目列表
-- 点击项目项时打开/聚焦 Webview 面板
+- 显示"Superpowers"根节点，作为打开 Webview 的入口
+- 点击后打开/聚焦 Webview 面板
+- Webview 关闭后，可再次点击重新打开
 
 #### 2. Webview Provider (webview/provider.ts)
 
@@ -119,6 +120,12 @@ TreeView 初始化
     ↓
 渲染面板
 ```
+
+### 文件扫描触发条件
+
+1. **首次激活**: 插件激活时自动扫描
+2. **手动刷新**: 用户执行 `superpowers.refresh` 命令
+3. **文件变化**: 监听 `docs/superpowers/` 目录的文件变化事件（可选 P3）
 
 ## UI 设计
 
@@ -199,7 +206,7 @@ const total = (content.match(/^- \[[ x]\]/gim) || []).length;
       "view/item/context": [
         {
           "command": "superpowers.executePlan",
-          "when": "view == superpowers-plans",
+          "when": "view == superpowers-explorer",
           "group": "inline"
         }
       ]
