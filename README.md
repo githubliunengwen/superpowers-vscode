@@ -15,7 +15,10 @@
 
 <!-- commands -->
 
-**No data**
+| Command                 | Title                     |
+| ----------------------- | ------------------------- |
+| `superpowers.openPanel` | Open Superpowers Explorer |
+| `superpowers.refresh`   | Refresh Superpowers Data  |
 
 <!-- commands -->
 
