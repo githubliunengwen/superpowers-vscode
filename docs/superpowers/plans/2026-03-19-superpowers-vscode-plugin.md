@@ -559,35 +559,37 @@ git commit -m "✨ feat: 创建 TreeView Provider"
 **Files:**
 - Modify: `package.json`
 
-- [ ] **Step 1: 更新 package.json 元数据和贡献点**
+**注意**: 需要合并以下字段到现有 `package.json`，保留 `scripts`、`devDependencies`、`repository` 等现有字段。
 
+- [ ] **Step 1: 更新元数据字段**
+
+修改以下字段：
 ```json
 {
   "publisher": "superpowers",
   "name": "superpowers-vscode",
   "displayName": "Superpowers",
   "version": "0.1.0",
-  "private": true,
-  "packageManager": "pnpm@10.27.0",
   "description": "Superpowers specs and plans explorer",
-  "author": "Superpowers",
-  "license": "MIT",
-  "categories": [
-    "Other"
-  ],
-  "main": "./dist/index.cjs",
-  "icon": "res/icon.png",
-  "files": [
-    "LICENSE.md",
-    "dist/*",
-    "res/*"
-  ],
-  "engines": {
-    "vscode": "^1.97.0"
-  },
+  "author": "Superpowers"
+}
+```
+
+- [ ] **Step 2: 更新 activationEvents**
+
+```json
+{
   "activationEvents": [
-    "onView:superpowers-explorer"
-  ],
+    "onView:superpowers-explorer",
+    "onCommand:superpowers.refresh"
+  ]
+}
+```
+
+- [ ] **Step 3: 添加 contributes**
+
+```json
+{
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -634,10 +636,12 @@ git commit -m "✨ feat: 创建 TreeView Provider"
 }
 ```
 
-- [ ] **Step 2: 提交**
+- [ ] **Step 4: 提交**
 
 ```bash
 git add package.json
+git commit -m "✨ feat: 更新 package.json 元数据和贡献点"
+```
 git commit -m "✨ feat: 更新 package.json 元数据和贡献点"
 ```
 
