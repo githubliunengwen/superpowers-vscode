@@ -1,7 +1,9 @@
 import { defineExtension } from 'reactive-vscode'
 import * as fs from 'fs'
 import * as vscode from 'vscode'
-import { markPlanContentAsCompleted } from './planCompletion'
+import { extensionId } from './generated/meta'
+import { resolveExtensionUri } from './extensionRuntime'
+import { markPlanContentAsCompleted, markPlanContentAsNeedsTesting } from './planCompletion'
 import { shouldAutoOpenPanel } from './panelOpenInteraction'
 import { SuperpowersScanner } from './scanner'
 import { SuperpowersTreeDataProvider } from './treeView'
@@ -10,7 +12,10 @@ import { SuperpowersPanel } from './webview/panel'
 export const { activate, deactivate } = defineExtension(() => {
   const scanner = new SuperpowersScanner()
   const treeDataProvider = new SuperpowersTreeDataProvider()
-  const extensionUri = vscode.extensions.getExtension('superpowers.superpowers-vscode')!.extensionUri
+  const extensionUri = resolveExtensionUri({
+    extensionId,
+    getExtension: id => vscode.extensions.getExtension(id),
+  })
   let isAutoOpeningPanel = false
 
   // 注册 TreeView
@@ -87,6 +92,20 @@ export const { activate, deactivate } = defineExtension(() => {
 
     const content = fs.readFileSync(planPath, 'utf-8')
     const updatedContent = markPlanContentAsCompleted(content)
+
+    if (updatedContent === content)
+      return
+
+    fs.writeFileSync(planPath, updatedContent, 'utf-8')
+    await vscode.commands.executeCommand('superpowers.refresh')
+  })
+
+  vscode.commands.registerCommand('superpowers.markPlanNeedsTesting', async (planPath?: string) => {
+    if (!planPath)
+      return
+
+    const content = fs.readFileSync(planPath, 'utf-8')
+    const updatedContent = markPlanContentAsNeedsTesting(content)
 
     if (updatedContent === content)
       return

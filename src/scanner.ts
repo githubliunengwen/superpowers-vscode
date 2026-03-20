@@ -1,6 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import type { PlanFile, SpecFile, SuperpowersData } from './types'
+import { isPlanContentMarkedAsNeedsTesting } from './planCompletion'
 
 export class SuperpowersScanner {
   private readonly specsDir = 'docs/superpowers/specs'
@@ -59,6 +60,7 @@ export class SuperpowersScanner {
         date,
         title: parsed.title,
         path: filePath,
+        status: parsed.status,
         progress: parsed.progress,
       })
     }
@@ -73,13 +75,16 @@ export class SuperpowersScanner {
     }
   }
 
-  parsePlan(content: string, fileName: string): { title: string, progress: { completed: number, total: number } } {
+  parsePlan(content: string, fileName: string): { title: string, status: PlanFile['status'], progress: { completed: number, total: number } } {
     const titleMatch = content.match(/^# (.+)$/m)
     const completed = (content.match(/^- \[x\]/gim) || []).length
     const total = (content.match(/^- \[[ x]\]/gim) || []).length
+    const isCompleted = total > 0 && completed === total
+    const isNeedsTesting = isPlanContentMarkedAsNeedsTesting(content)
 
     return {
       title: titleMatch ? titleMatch[1] : fileName.replace('.md', ''),
+      status: isCompleted ? 'completed' : (isNeedsTesting ? 'needsTesting' : 'default'),
       progress: { completed, total },
     }
   }

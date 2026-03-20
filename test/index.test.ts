@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { markPlanContentAsCompleted } from '../src/planCompletion'
-import { shouldAutoOpenPanel } from '../src/panelOpenInteraction'
+import { markPlanContentAsCompleted, markPlanContentAsNeedsTesting } from '../src/planCompletion'
+import { getPlanContextMenuVisibility, shouldAutoOpenPanel } from '../src/panelOpenInteraction'
 
 describe('shouldAutoOpenPanel', () => {
   it('在新的可见切换时返回 true', () => {
@@ -65,5 +65,74 @@ describe('markPlanContentAsCompleted', () => {
 
 - [x] task 1
 普通文本`)
+  })
+
+  it('标记完成时移除需要测试标记', () => {
+    const content = `# Demo Plan
+<!-- superpowers:needs-testing -->
+
+- [ ] task 1`
+
+    expect(markPlanContentAsCompleted(content)).toBe(`# Demo Plan
+
+- [x] task 1`)
+  })
+})
+
+describe('markPlanContentAsNeedsTesting', () => {
+  it('在标题后插入需要测试标记', () => {
+    const content = `# Demo Plan
+
+- [ ] task 1`
+
+    expect(markPlanContentAsNeedsTesting(content)).toBe(`# Demo Plan
+<!-- superpowers:needs-testing -->
+
+- [ ] task 1`)
+  })
+
+  it('重复标记时不插入重复内容', () => {
+    const content = `# Demo Plan
+<!-- superpowers:needs-testing -->
+
+- [ ] task 1`
+
+    expect(markPlanContentAsNeedsTesting(content)).toBe(content)
+  })
+
+  it('从已完成切回需要测试时清除完成状态', () => {
+    const content = `# Demo Plan
+
+- [x] task 1
+- [x] task 2`
+
+    expect(markPlanContentAsNeedsTesting(content)).toBe(`# Demo Plan
+<!-- superpowers:needs-testing -->
+
+- [ ] task 1
+- [ ] task 2`)
+  })
+})
+
+describe('getPlanContextMenuVisibility', () => {
+  it('默认状态显示两个动作', () => {
+    expect(getPlanContextMenuVisibility('default')).toEqual({
+      showNeedsTesting: true,
+      showCompleted: true,
+    })
+  })
+
+  it('需要测试状态隐藏对应动作', () => {
+    expect(getPlanContextMenuVisibility('needsTesting')).toEqual({
+      showNeedsTesting: false,
+      showCompleted: true,
+    })
+  })
+
+  it('已完成状态隐藏对应动作', () => {
+    expect(getPlanContextMenuVisibility('completed')).toEqual({
+      showNeedsTesting: true,
+      showCompleted: false,
+    })
   })
 })

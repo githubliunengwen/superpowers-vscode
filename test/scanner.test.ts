@@ -37,6 +37,15 @@ describe('SuperpowersScanner', () => {
       expect(result.progress.completed).toBe(0)
       expect(result.progress.total).toBe(0)
     })
+
+    it('识别需要测试状态', () => {
+      const content = `# 计划
+<!-- superpowers:needs-testing -->
+
+- [ ] 任务1`
+      const result = scanner.parsePlan(content, 'test-plan')
+      expect(result.status).toBe('needsTesting')
+    })
   })
 
   describe('parseDateFromFilename', () => {
