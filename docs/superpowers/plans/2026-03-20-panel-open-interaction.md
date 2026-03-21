@@ -1,4 +1,4 @@
-# Superpowers 面板首次点击打开交互 Implementation Plan
+# Superpowers 面板首次点击打开交互实施计划
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -844,12 +844,12 @@ git commit -m "✅ test(bindings): 建立扩展入口绑定 seam"
 - [ ] **Step 1: 在 `src/index.ts` 引入纯函数模块、装配 seam 和入口绑定函数**
 
 ```typescript
+import { createIndexBindings } from './indexBindings'
 import {
   createActivityBarAutoOpenHandler,
   createOpenPanelHandler,
 } from './panelOpenInteraction'
 import { createPanelOpenWiring } from './panelOpenWiring'
-import { createIndexBindings } from './indexBindings'
 ```
 
 - [ ] **Step 2: 抽出共享扫描函数，供通用入口复用**
@@ -879,13 +879,13 @@ vscode.commands.registerCommand('superpowers.openPanel', openPanel)
 
 ```typescript
 let isAutoOpeningPanel = false
-let allowAutoOpen = true
+const allowAutoOpen = true
 
 const openPanelFromActivityBar = createActivityBarAutoOpenHandler({
   openPanel,
   executeCommand: command => vscode.commands.executeCommand(command),
   getIsAutoOpeningPanel: () => isAutoOpeningPanel,
-  setIsAutoOpeningPanel: value => { isAutoOpeningPanel = value },
+  setIsAutoOpeningPanel: (value) => { isAutoOpeningPanel = value },
   logDebug: (message, error) => console.debug(message, error),
 })
 ```
