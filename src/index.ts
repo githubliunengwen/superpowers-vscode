@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as vscode from 'vscode'
 import { extensionId } from './generated/meta'
 import { resolveExtensionUri } from './extensionRuntime'
-import { markPlanContentAsCompleted, markPlanContentAsNeedsTesting } from './planCompletion'
+import { markPlanContentAsCompleted, markPlanContentAsNeedsTesting, setPlanContentStatus } from './planCompletion'
 import { shouldAutoOpenPanel } from './panelOpenInteraction'
 import { SuperpowersScanner } from './scanner'
 import { SuperpowersTreeDataProvider } from './treeView'
@@ -106,6 +106,24 @@ export const { activate, deactivate } = defineExtension(() => {
 
     const content = fs.readFileSync(planPath, 'utf-8')
     const updatedContent = markPlanContentAsNeedsTesting(content)
+
+    if (updatedContent === content)
+      return
+
+    fs.writeFileSync(planPath, updatedContent, 'utf-8')
+    await vscode.commands.executeCommand('superpowers.refresh')
+  })
+
+  vscode.commands.registerCommand('superpowers.setPlanStatus', async (planPath?: string, status?: string) => {
+    if (!planPath || !status)
+      return
+
+    const validStatuses = ['completed', 'needsTesting', 'default']
+    if (!validStatuses.includes(status))
+      return
+
+    const content = fs.readFileSync(planPath, 'utf-8')
+    const updatedContent = setPlanContentStatus(content, status as 'completed' | 'needsTesting' | 'default')
 
     if (updatedContent === content)
       return
