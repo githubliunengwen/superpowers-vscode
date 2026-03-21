@@ -62,11 +62,14 @@ export class SuperpowersPanel {
         case 'completePlan':
           vscode.commands.executeCommand('superpowers.completePlan', message.path)
           break
-      case 'refresh':
-        vscode.commands.executeCommand('superpowers.refresh')
-        break
+        case 'setPlanStatus':
+          vscode.commands.executeCommand('superpowers.setPlanStatus', message.path, message.status)
+          break
+        case 'refresh':
+          vscode.commands.executeCommand('superpowers.refresh')
+          break
+      }
     }
-  }
 
   public dispose(): void {
     SuperpowersPanel.currentPanel = undefined
