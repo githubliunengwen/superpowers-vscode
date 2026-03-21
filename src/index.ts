@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { defineExtension } from 'reactive-vscode'
 import * as vscode from 'vscode'
 import { resolveExtensionUri } from './extensionRuntime'
@@ -129,6 +130,44 @@ export const { activate, deactivate } = defineExtension(() => {
       return
 
     fs.writeFileSync(planPath, updatedContent, 'utf-8')
+    await vscode.commands.executeCommand('superpowers.refresh')
+  })
+
+  vscode.commands.registerCommand('superpowers.deleteFile', async (filePath?: string, type?: string) => {
+    if (!filePath || !type)
+      return
+
+    // 解析文件名以查找对应的spec和plan
+    const fileName = path.basename(filePath, '.md')
+    const workspaceFolders = vscode.workspace.workspaceFolders
+    if (!workspaceFolders || workspaceFolders.length === 0)
+      return
+
+    const workspaceRoot = workspaceFolders[0].uri.fsPath
+    const specsDir = path.join(workspaceRoot, 'docs/superpowers/specs')
+    const plansDir = path.join(workspaceRoot, 'docs/superpowers/plans')
+
+    // 确认删除
+    const confirm = await vscode.window.showWarningMessage(
+      `确定要删除 ${type === 'spec' ? 'Spec' : 'Plan'} "${fileName}" 及其关联文件吗？`,
+      '删除',
+      '取消',
+    )
+
+    if (confirm !== '删除')
+      return
+
+    // 删除spec和plan
+    const specPath = path.join(specsDir, `${fileName}.md`)
+    const planPath = path.join(plansDir, `${fileName}.md`)
+
+    if (fs.existsSync(specPath)) {
+      fs.unlinkSync(specPath)
+    }
+    if (fs.existsSync(planPath)) {
+      fs.unlinkSync(planPath)
+    }
+
     await vscode.commands.executeCommand('superpowers.refresh')
   })
 

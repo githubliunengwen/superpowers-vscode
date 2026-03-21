@@ -88,6 +88,12 @@ export function getSuperpowersPanelHtmlContent(): string {
     .data-table .action:hover {
       text-decoration: underline;
     }
+    .data-table .action.delete {
+      color: #f48771;
+    }
+    .data-table .action.delete:hover {
+      color: #ff6b6b;
+    }
     .status-badge {
       display: inline-block;
       padding: 2px 8px;
@@ -113,6 +119,27 @@ export function getSuperpowersPanelHtmlContent(): string {
       background: #3d3d3d;
       color: #cccccc;
       border-color: #888888;
+    }
+    .sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable:hover {
+      color: var(--vscode-textLink-foreground);
+    }
+    .sortable .sort-icon {
+      margin-left: 4px;
+      opacity: 0.5;
+    }
+    .sortable.asc .sort-icon::after {
+      content: '▲';
+    }
+    .sortable.desc .sort-icon::after {
+      content: '▼';
+    }
+    .sortable.none .sort-icon::after {
+      content: '▾';
+      opacity: 0.3;
     }
     .status-dropdown {
       position: absolute;
@@ -179,7 +206,7 @@ export function getSuperpowersPanelHtmlContent(): string {
       <thead>
         <tr>
           <th>名称</th>
-          <th>日期</th>
+          <th class="sortable" onclick="sortSpecs('date')">日期<span class="sort-icon"></span></th>
           <th>操作</th>
         </tr>
       </thead>
@@ -192,9 +219,9 @@ export function getSuperpowersPanelHtmlContent(): string {
       <thead>
         <tr>
           <th>名称</th>
-          <th>日期</th>
-          <th>进度</th>
-          <th>状态</th>
+          <th class="sortable" onclick="sortPlans('date')">日期<span class="sort-icon"></span></th>
+          <th class="sortable" onclick="sortPlans('progress')">进度<span class="sort-icon"></span></th>
+          <th class="sortable" onclick="sortPlans('status')">状态<span class="sort-icon"></span></th>
           <th>操作</th>
         </tr>
       </thead>
@@ -213,6 +240,16 @@ export function getSuperpowersPanelHtmlContent(): string {
     const statusDropdown = document.getElementById('status-dropdown');
     let currentPlanPath = null;
     let currentStatus = null;
+    
+    // 排序状态
+    let specsSortField = 'date';
+    let specsSortOrder = 'desc';
+    let plansSortField = 'date';
+    let plansSortOrder = 'desc';
+    
+    // 原始数据
+    let specsData = [];
+    let plansData = [];
 
     function switchTab(tabName) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -222,7 +259,11 @@ export function getSuperpowersPanelHtmlContent(): string {
     }
 
     function openFile(path) {
-      vscode.postMessage({ command: 'openFile', path });
+      vscode.postMessage({ command: 'openFile', path, preview: true });
+    }
+
+    function deleteFile(path, type) {
+      vscode.postMessage({ command: 'deleteFile', path, type });
     }
 
     function refresh() {
@@ -266,8 +307,77 @@ export function getSuperpowersPanelHtmlContent(): string {
         default: return '进行中';
       }
     }
+    
+    // 状态排序权重：进行中(0) > 需要测试(1) > 已完成(2)
+    function getStatusWeight(status) {
+      switch (status) {
+        case 'default': return 0;
+        case 'needsTesting': return 1;
+        case 'completed': return 2;
+        default: return 3;
+      }
+    }
+    
+    function sortSpecs(field) {
+      if (specsSortField === field) {
+        specsSortOrder = specsSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        specsSortField = field;
+        specsSortOrder = 'desc';
+      }
+      
+      const sorted = [...specsData].sort((a, b) => {
+        let cmp = 0;
+        if (field === 'date') {
+          cmp = a.date.localeCompare(b.date);
+        }
+        return specsSortOrder === 'asc' ? cmp : -cmp;
+      });
+      
+      renderSpecsTable(sorted);
+    }
+    
+    function sortPlans(field) {
+      if (plansSortField === field) {
+        plansSortOrder = plansSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        plansSortField = field;
+        plansSortOrder = 'desc';
+      }
+      
+      const sorted = [...plansData].sort((a, b) => {
+        let cmp = 0;
+        if (field === 'date') {
+          cmp = a.date.localeCompare(b.date);
+        } else if (field === 'progress') {
+          const aRatio = a.progress.total > 0 ? a.progress.completed / a.progress.total : 0;
+          const bRatio = b.progress.total > 0 ? b.progress.completed / b.progress.total : 0;
+          cmp = aRatio - bRatio;
+        } else if (field === 'status') {
+          cmp = getStatusWeight(a.status) - getStatusWeight(b.status);
+        }
+        return plansSortOrder === 'asc' ? cmp : -cmp;
+      });
+      
+      renderPlansTable(sorted);
+    }
 
     function renderSpecs(specs) {
+      specsData = specs;
+      
+      // 应用当前排序
+      const sorted = [...specsData].sort((a, b) => {
+        let cmp = 0;
+        if (specsSortField === 'date') {
+          cmp = a.date.localeCompare(b.date);
+        }
+        return specsSortOrder === 'asc' ? cmp : -cmp;
+      });
+      
+      renderSpecsTable(sorted);
+    }
+    
+    function renderSpecsTable(specs) {
       const tbody = document.getElementById('specs-body');
       document.getElementById('specs-count').textContent = '(' + specs.length + ')';
 
@@ -281,13 +391,34 @@ export function getSuperpowersPanelHtmlContent(): string {
         html += '<tr>';
         html += '<td class="name" onclick="openFile(\\'' + spec.path + '\\')">' + spec.title + '</td>';
         html += '<td class="date">' + spec.date + '</td>';
-        html += '<td class="action" onclick="openFile(\\'' + spec.path + '\\')">打开</td>';
+        html += '<td class="action delete" onclick="deleteFile(\\'' + spec.path + '\\', \\'spec\\')">删除</td>';
         html += '</tr>';
       });
       tbody.innerHTML = html;
     }
 
     function renderPlans(plans) {
+      plansData = plans;
+      
+      // 应用当前排序
+      const sorted = [...plansData].sort((a, b) => {
+        let cmp = 0;
+        if (plansSortField === 'date') {
+          cmp = a.date.localeCompare(b.date);
+        } else if (plansSortField === 'progress') {
+          const aRatio = a.progress.total > 0 ? a.progress.completed / a.progress.total : 0;
+          const bRatio = b.progress.total > 0 ? b.progress.completed / b.progress.total : 0;
+          cmp = aRatio - bRatio;
+        } else if (plansSortField === 'status') {
+          cmp = getStatusWeight(a.status) - getStatusWeight(b.status);
+        }
+        return plansSortOrder === 'asc' ? cmp : -cmp;
+      });
+      
+      renderPlansTable(sorted);
+    }
+    
+    function renderPlansTable(plans) {
       const tbody = document.getElementById('plans-body');
       document.getElementById('plans-count').textContent = '(' + plans.length + ')';
 
@@ -308,7 +439,7 @@ export function getSuperpowersPanelHtmlContent(): string {
         html += '<td class="date">' + plan.date + '</td>';
         html += '<td class="progress ' + progressClass + '">' + progressText + '</td>';
         html += '<td><span class="status-badge ' + statusClass + '" onclick="showStatusDropdown(event, \\'' + plan.path + '\\', \\'' + statusClass + '\\')">' + statusText + ' ▾</span></td>';
-        html += '<td class="action" onclick="openFile(\\'' + plan.path + '\\')">打开</td>';
+        html += '<td class="action delete" onclick="deleteFile(\\'' + plan.path + '\\', \\'plan\\')">删除</td>';
         html += '</tr>';
       });
       tbody.innerHTML = html;

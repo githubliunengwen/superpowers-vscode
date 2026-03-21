@@ -54,7 +54,10 @@ export class SuperpowersPanel {
   private _handleMessage(message: any): void {
     switch (message.command) {
       case 'openFile':
-        vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path))
+        vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path), { preview: message.preview ?? false })
+        break
+      case 'deleteFile':
+        vscode.commands.executeCommand('superpowers.deleteFile', message.path, message.type)
         break
       case 'markPlanNeedsTesting':
         vscode.commands.executeCommand('superpowers.markPlanNeedsTesting', message.path)
