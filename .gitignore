@@ -13,3 +13,5 @@ temp
 src/generated
 .env
 .superpowers/
+.gitnexus
+.claude/
