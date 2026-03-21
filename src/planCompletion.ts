@@ -27,33 +27,18 @@ function removeNeedsTestingMarker(content: string): string {
 }
 
 /**
- * 设置计划文件的状态标记
+ * 设置计划文件的状态
  * @param content 计划文件内容
  * @param status 状态: 'completed' | 'needsTesting' | 'default'
  * @returns 更新后的内容
  */
 export function setPlanContentStatus(content: string, status: 'completed' | 'needsTesting' | 'default'): string {
-  // 先清除现有状态标记
-  const updated = content.replace(/^> \*\*Status:\*\* .+\n/m, '')
-
-  if (status === 'default') {
-    return updated
+  switch (status) {
+    case 'completed':
+      return markPlanContentAsCompleted(content)
+    case 'needsTesting':
+      return markPlanContentAsNeedsTesting(content)
+    case 'default':
+      return removeNeedsTestingMarker(content)
   }
-
-  // 添加新状态标记到文件开头（在第一个 # 之后）
-  const lines = updated.split('\n')
-  let insertIndex = 1 // 默认插在第一行（标题）之后
-
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith('# ')) {
-      insertIndex = i + 1
-      break
-    }
-  }
-
-  const statusText = status === 'completed' ? 'completed' : 'needs-testing'
-  const statusLine = `> **Status:** ${statusText}`
-  lines.splice(insertIndex, 0, statusLine)
-
-  return lines.join('\n')
 }
